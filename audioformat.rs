@@ -9,7 +9,9 @@
 
 //! Audio sample format utility routines.
 
-pub trait AudioFormat {
+use std::marker::MarkerTrait;
+
+pub trait AudioFormat : MarkerTrait {
     type SampleType;
 }
 

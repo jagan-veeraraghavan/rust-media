@@ -18,6 +18,7 @@ use libc::{c_int, c_long};
 use std::iter;
 use std::mem;
 use std::num::SignedInt;
+use std::marker;
 
 /// A simple video/audio player.
 pub struct Player<'a> {
@@ -36,6 +37,8 @@ pub struct Player<'a> {
     last_frame_presentation_time: Option<Timestamp>,
     /// The time at which the next frame is to be played.
     next_frame_presentation_time: Option<Timestamp>,
+
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Player<'a> {
@@ -83,6 +86,7 @@ impl<'a> Player<'a> {
             frame_delay: None,
             last_frame_presentation_time: None,
             next_frame_presentation_time: None,
+	    marker: marker::PhantomData
         }
     }
 

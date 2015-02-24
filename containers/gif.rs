@@ -27,6 +27,7 @@ use std::num::FromPrimitive;
 use std::old_io::{BufReader, BufWriter, SeekStyle};
 use std::ptr;
 use std::slice;
+use std::marker;
 
 #[repr(C)]
 pub struct FileType {
@@ -238,6 +239,7 @@ impl FileType {
             if !(*self.file).SColorMap.is_null() {
                 Some(ColorMapObject {
                     map: (*self.file).SColorMap,
+		    marker: marker::PhantomData
                 })
             } else {
                 None
@@ -340,6 +342,7 @@ impl<'a> ImageDesc<'a> {
         if !self.desc.ColorMap.is_null() {
             Some(ColorMapObject {
                 map: self.desc.ColorMap,
+		marker: marker::PhantomData
             })
         } else {
             None
@@ -349,6 +352,7 @@ impl<'a> ImageDesc<'a> {
 
 pub struct ColorMapObject<'a> {
     map: *mut ffi::ColorMapObject,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> ColorMapObject<'a> {

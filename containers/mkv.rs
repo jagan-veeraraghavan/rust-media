@@ -22,6 +22,7 @@ use std::num::FromPrimitive;
 use std::old_io::SeekStyle;
 use std::ptr;
 use std::slice;
+use std::marker;
 
 pub struct MkvReader {
     reader: WebmIMkvReaderRef,
@@ -174,6 +175,7 @@ impl Segment {
         }
         Some(Tracks {
             tracks: tracks,
+	    marker: marker::PhantomData
         })
     }
 
@@ -188,6 +190,7 @@ impl Segment {
             segment_info: unsafe {
                 WebmSegmentGetInfo(self.segment)
             },
+	    marker: marker::PhantomData
         }
     }
 
@@ -200,6 +203,7 @@ impl Segment {
         } else {
             Some(Cluster {
                 cluster: result,
+		marker: marker::PhantomData
             })
         }
     }
@@ -213,6 +217,7 @@ impl Segment {
         } else {
             Some(Cluster {
                 cluster: result,
+		marker: marker::PhantomData
             })
         }
     }
@@ -220,6 +225,7 @@ impl Segment {
 
 pub struct SegmentInfo<'a> {
     segment_info: WebmSegmentInfoRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> SegmentInfo<'a> {
@@ -232,6 +238,7 @@ impl<'a> SegmentInfo<'a> {
 
 pub struct Tracks<'a> {
     tracks: WebmTracksRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Tracks<'a> {
@@ -245,7 +252,8 @@ impl<'a> Tracks<'a> {
         Track {
             track: unsafe {
                 WebmTracksGetTrackByIndex(self.tracks, index)
-            }
+            },
+	    marker: marker::PhantomData
         }
     }
 
@@ -253,7 +261,8 @@ impl<'a> Tracks<'a> {
         Track {
             track: unsafe {
                 WebmTracksGetTrackByNumber(self.tracks, number)
-            }
+            },
+	    marker: marker::PhantomData
         }
     }
 }
@@ -261,6 +270,7 @@ impl<'a> Tracks<'a> {
 #[derive(Clone)]
 pub struct Track<'a> {
     track: WebmTrackRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Track<'a> {
@@ -300,6 +310,7 @@ impl<'a> Track<'a> {
             track: unsafe {
                 mem::transmute::<_,WebmVideoTrackRef>(self.track)
             },
+	    marker: marker::PhantomData
         }
     }
 
@@ -311,6 +322,7 @@ impl<'a> Track<'a> {
             track: unsafe {
                 mem::transmute::<_,WebmAudioTrackRef>(self.track)
             },
+	    marker: marker::PhantomData
         }
     }
 }
@@ -318,6 +330,7 @@ impl<'a> Track<'a> {
 #[derive(Clone)]
 pub struct VideoTrack<'a> {
     track: WebmVideoTrackRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> VideoTrack<'a> {
@@ -326,6 +339,7 @@ impl<'a> VideoTrack<'a> {
             track: unsafe {
                 mem::transmute::<_,WebmTrackRef>(self.track)
             },
+	    marker: marker::PhantomData
         }
     }
 
@@ -351,6 +365,7 @@ impl<'a> VideoTrack<'a> {
 #[derive(Clone)]
 pub struct AudioTrack<'a> {
     track: WebmAudioTrackRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> AudioTrack<'a> {
@@ -359,6 +374,7 @@ impl<'a> AudioTrack<'a> {
             track: unsafe {
                 mem::transmute::<_,WebmTrackRef>(self.track)
             },
+	    marker: marker::PhantomData
         }
     }
 
@@ -384,6 +400,7 @@ impl<'a> AudioTrack<'a> {
 #[derive(Clone)]
 pub struct Cluster<'a> {
     cluster: WebmClusterRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Cluster<'a> {
@@ -408,6 +425,7 @@ impl<'a> Cluster<'a> {
         if err >= 0 {
             Ok(BlockEntry {
                 entry: entry,
+		marker: marker::PhantomData
             })
         } else {
             Err(err)
@@ -422,6 +440,7 @@ impl<'a> Cluster<'a> {
         if err >= 0 && entry != ptr::null_mut() {
             Ok(BlockEntry {
                 entry: entry,
+		marker: marker::PhantomData
             })
         } else {
             Err(err)
@@ -447,6 +466,7 @@ impl<'a> Cluster<'a> {
         if err >= 0 {
             Ok(BlockEntry {
                 entry: entry,
+		marker: marker::PhantomData
             })
         } else {
             Err(err)
@@ -478,6 +498,7 @@ pub struct ClusterInfo {
 #[derive(Clone)]
 pub struct BlockEntry<'a> {
     entry: WebmBlockEntryRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> BlockEntry<'a> {
@@ -485,6 +506,7 @@ impl<'a> BlockEntry<'a> {
         unsafe {
             Block {
                 block: WebmBlockEntryGetBlock(self.entry),
+		marker: marker::PhantomData
             }
         }
     }
@@ -499,6 +521,7 @@ impl<'a> BlockEntry<'a> {
 #[derive(Clone)]
 pub struct Block<'a> {
     block: WebmBlockRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Block<'a> {
@@ -511,7 +534,8 @@ impl<'a> Block<'a> {
     pub fn frame(&self, frame_index: c_int) -> BlockFrame<'a> {
         unsafe {
             BlockFrame {
-                frame: WebmBlockGetFrame(self.block, frame_index)
+                frame: WebmBlockGetFrame(self.block, frame_index),
+		marker: marker::PhantomData
             }
         }
     }
@@ -549,6 +573,7 @@ impl<'a> Block<'a> {
 
 pub struct BlockFrame<'a> {
     frame: WebmBlockFrameRef,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> BlockFrame<'a> {

@@ -15,6 +15,7 @@ use libc::{c_char, c_int, c_long};
 use std::i32;
 use std::mem;
 use std::slice;
+use std::marker;
 
 pub struct SyncState {
     state: ffi::ogg_sync_state,
@@ -127,12 +128,14 @@ impl StreamState {
         }
         Packet {
             packet: packet,
+	    marker: marker::PhantomData
         }
     }
 }
 
 pub struct Packet<'a> {
     packet: ffi::ogg_packet,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Packet<'a> {
@@ -153,6 +156,7 @@ impl<'a> Packet<'a> {
                 granulepos: 0,
                 packetno: packet_number,
             },
+	    marker: marker::PhantomData
         }
     }
 

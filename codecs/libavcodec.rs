@@ -23,6 +23,7 @@ use std::i32;
 use std::mem;
 use std::ptr;
 use std::slice;
+use std::marker;
 
 pub type AvCodecId = ffi::AVCodecID;
 
@@ -342,6 +343,7 @@ impl AvFrame {
 
 pub struct AvPacket<'a> {
     packet: ffi::EitherAVPacket,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> AvPacket<'a> {
@@ -377,6 +379,7 @@ impl<'a> AvPacket<'a> {
 
         AvPacket {
             packet: packet,
+	    marker: marker::PhantomData
         }
     }
 }

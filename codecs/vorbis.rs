@@ -15,6 +15,7 @@ use libc::{c_float, c_int};
 use std::mem;
 use std::ptr;
 use std::slice;
+use std::marker;
 
 pub struct VorbisInfo {
     info: Box<ffi::vorbis_info>,
@@ -126,6 +127,7 @@ impl VorbisDspState {
                 (*self.state.vi).channels
             },
             samples: result,
+	    marker: marker::PhantomData
         })
     }
 
@@ -201,6 +203,7 @@ pub struct Pcm<'a> {
     pcm: *mut *mut c_float,
     channels: c_int,
     samples: c_int,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> Pcm<'a> {
@@ -301,6 +304,7 @@ impl audiodecoder::AudioDecoder for AudioDecoderImpl {
             Ok(pcm) => {
                 Ok(Box::new(DecodedAudioSamplesImpl {
                     pcm: pcm,
+		    marker: marker::PhantomData
                 }) as Box<audiodecoder::DecodedAudioSamples + 'b>)
             }
             Err(_) => Err(()),
@@ -314,6 +318,7 @@ impl audiodecoder::AudioDecoder for AudioDecoderImpl {
 
 struct DecodedAudioSamplesImpl<'a> {
     pcm: Pcm<'a>,
+    marker: marker::PhantomData<&'a i32>
 }
 
 impl<'a> audiodecoder::DecodedAudioSamples for DecodedAudioSamplesImpl<'a> {
