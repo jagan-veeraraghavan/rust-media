@@ -1,2 +1,0 @@
-make: Nothing to be done for `all'.
-cargo:rustc-flags=-L native=/Users/paulnispel/Downloads/rust-media/target/debug/build/rust-media-1fa58c728a70ec8f/out

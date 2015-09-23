@@ -1,3 +1,0 @@
-#ifndef LIBPLATFORM_CONFIG_H
-#define LIBPLATFORM_CONFIG_H
-#endif
