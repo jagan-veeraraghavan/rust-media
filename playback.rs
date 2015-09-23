@@ -17,7 +17,7 @@ use videodecoder::{DecodedVideoFrame, RegisteredVideoDecoder, VideoDecoder};
 use libc::{c_int, c_long};
 use std::iter;
 use std::mem;
-use std::num::SignedInt;
+use std::marker::PhantomData;
 
 /// A simple video/audio player.
 pub struct Player<'a> {
@@ -36,13 +36,14 @@ pub struct Player<'a> {
     last_frame_presentation_time: Option<Timestamp>,
     /// The time at which the next frame is to be played.
     next_frame_presentation_time: Option<Timestamp>,
+    phantom: PhantomData<&'a u8>,
 }
 
 impl<'a> Player<'a> {
     pub fn new<'b>(reader: Box<StreamReader>, mime_type: &str) -> Player<'b> {
-        let mut reader = RegisteredContainerReader::get(mime_type.as_slice()).unwrap()
-                                                                             .new(reader)
-                                                                             .unwrap();
+        let mut reader = RegisteredContainerReader::get(mime_type).unwrap()
+                                                                  .new(reader)
+                                                                  .unwrap();
 
         let (video_player_info, audio_player_info) = {
             let (video_codec, audio_codec) =
@@ -51,9 +52,9 @@ impl<'a> Player<'a> {
             let (mut video_track, mut audio_track) = (None, None);
             for track_index in 0..reader.track_count() {
                 let track = reader.track_by_index(track_index);
-                if track.track_type() == TrackType::Video && video_track.is_none() {
+                if track.is_video() && video_track.is_none() {
                     video_track = Some(track)
-                } else if track.track_type() == TrackType::Audio && audio_track.is_none() {
+                } else if track.is_audio() && audio_track.is_none() {
                     audio_track = Some(track)
                 }
             }
@@ -83,19 +84,35 @@ impl<'a> Player<'a> {
             frame_delay: None,
             last_frame_presentation_time: None,
             next_frame_presentation_time: None,
+            phantom: PhantomData,
         }
     }
 
     pub fn decode_frame(&mut self) -> Result<(),()> {
+        // This code abuses Box's magic ownership to get audio and video tracks
+        // without borrowing self. This is why we just inline the code from those
+        // methods.
+
         let reader = &mut *self.reader;
+
         let video_track = self.video.as_ref().map(|video| {
-            reader.track_by_number(video.track_number as c_long)
+            let number = video.track_number;
+            if let TrackType::Video(track) = reader.track_by_number(number).track_type() {
+                track
+            } else {
+                unreachable!()
+            }
         });
-        let video_track = video_track.as_ref().map(|track| track.as_video_track().unwrap());
+
         let audio_track = self.audio.as_ref().map(|audio| {
-            reader.track_by_number(audio.track_number as c_long)
+            let number = audio.track_number;
+            if let TrackType::Audio(track) = reader.track_by_number(number).track_type() {
+                track
+            } else {
+                unreachable!()
+            }
         });
-        let audio_track = audio_track.as_ref().map(|track| track.as_audio_track().unwrap());
+
         'clusterloop: loop {
             let cluster = match (&video_track, &audio_track) {
                 (&Some(ref video_track), _) => {
@@ -191,7 +208,7 @@ impl<'a> Player<'a> {
                     };
                     decode_audio_frame(&mut *audio.codec,
                                        &*frame,
-                                       audio.samples.as_mut().unwrap().as_mut_slice());
+                                       &mut audio.samples.as_mut().unwrap());
                     audio.frame_index += 1;
 
                     // If there is a video track, we synchronize to it. Otherwise, read just one
@@ -212,14 +229,26 @@ impl<'a> Player<'a> {
         }
     }
 
-    /// Returns the number of the video track, if present.
-    pub fn video_track_number(&self) -> Option<i64> {
-        self.video.as_ref().map(|video| video.track_number)
+    pub fn video_track<'b>(&'b self) -> Option<Box<VideoTrack + 'b>> {
+        self.video.as_ref().map(|video| {
+            let number = video.track_number;
+            if let TrackType::Video(track) = self.reader.track_by_number(number).track_type() {
+                track
+            } else {
+                unreachable!()
+            }
+        })
     }
 
-    /// Returns the number of the audio track, if present.
-    pub fn audio_track_number(&self) -> Option<i64> {
-        self.audio.as_ref().map(|audio| audio.track_number)
+    pub fn audio_track<'b>(&'b self) -> Option<Box<AudioTrack + 'b>> {
+        self.audio.as_ref().map(|audio| {
+            let number = audio.track_number;
+            if let TrackType::Audio(track) = self.reader.track_by_number(number).track_type() {
+                track
+            } else {
+                unreachable!()
+            }
+        })
     }
 
     /// Returns the presentation time of the last frame, relative to the start of playback.
@@ -231,7 +260,7 @@ impl<'a> Player<'a> {
     pub fn next_frame_presentation_time(&self) -> Option<Timestamp> {
         self.next_frame_presentation_time
     }
-    
+
     /// Retrieves the decoded frame data and advances to the next frame.
     pub fn advance(&mut self) -> Result<DecodedFrame,()> {
         // Determine the frame delay, if possible.
@@ -305,21 +334,19 @@ fn read_track_metadata_and_initialize_codecs(reader: &mut ContainerReader)
     for track_index in 0..reader.track_count() {
         let track = reader.track_by_index(track_index);
         match track.track_type() {
-            TrackType::Video => {
-                let video_track = track.as_video_track().unwrap();
+            TrackType::Video(video_track) => {
                 if let Some(codec) = video_track.codec() {
                     let headers = video_track.headers();
-                    video_codec = Some(RegisteredVideoDecoder::get(codec.as_slice()).unwrap().new(
+                    video_codec = Some(RegisteredVideoDecoder::get(&codec).unwrap().new(
                             &*headers,
                             video_track.width() as i32,
                             video_track.height() as i32).unwrap());
                 }
             }
-            TrackType::Audio => {
-                let audio_track = track.as_audio_track().unwrap();
+            TrackType::Audio(audio_track) => {
                 if let Some(codec) = audio_track.codec() {
                     let headers = audio_track.headers();
-                    let info = RegisteredAudioDecoder::get(codec.as_slice()).unwrap().new(
+                    let info = RegisteredAudioDecoder::get(&codec).unwrap().new(
                             &*headers,
                             audio_track.sampling_rate(),
                             audio_track.channels());
@@ -337,24 +364,24 @@ fn decode_video_frame(codec: &mut VideoDecoder,
                       frames: &mut Vec<Box<DecodedVideoFrame + 'static>>) {
     let mut data = Vec::new();
     data.resize(frame.len() as usize, 0u8);
-    frame.read(data.as_mut_slice()).unwrap();
+    frame.read(&mut data).unwrap();
 
     let frame_presentation_time = frame.time() + frame.rendering_offset();
-    if let Ok(image) = codec.decode_frame(data.as_mut_slice(), &frame_presentation_time) {
+    if let Ok(image) = codec.decode_frame(&mut data, &frame_presentation_time) {
         frames.push(image)
     }
 }
 
 fn decode_audio_frame(codec: &mut AudioDecoder, frame: &Frame, samples: &mut [Vec<f32>]) {
     let mut data: Vec<u8> = iter::repeat(0).take(frame.len() as usize).collect();
-    frame.read(data.as_mut_slice()).unwrap();
-    if codec.decode(data.as_slice()).is_err() {
+    frame.read(&mut data).unwrap();
+    if codec.decode(&data).is_err() {
         return
     }
 
     let sample_count = match codec.decoded_samples() {
         Ok(pcm_output) => {
-            for channel in range(0, samples.len() as i32) {
+            for channel in 0 .. samples.len() as i32 {
                 samples[channel as usize].push_all(pcm_output.samples(channel).unwrap())
             }
             pcm_output.samples(0).unwrap().len()

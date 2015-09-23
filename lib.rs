@@ -7,10 +7,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(alloc, collections, core, io, libc, std_misc, unsafe_destructor)]
+#![feature(alloc, collections, core, libc, box_patterns, unsafe_no_drop_flag, duration)]
 
 extern crate alloc;
 extern crate libc;
+extern crate byteorder;
 
 #[cfg(target_os = "macos")]
 extern crate core_foundation;
@@ -52,3 +53,4 @@ pub mod platform {
     }
 }
 
+mod utils;
