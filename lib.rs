@@ -26,7 +26,6 @@ pub mod timing;
 pub mod videodecoder;
 
 pub mod codecs {
-    pub mod aac;
     pub mod h264;
     pub mod vpx;
 
