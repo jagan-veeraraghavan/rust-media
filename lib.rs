@@ -28,7 +28,6 @@ pub mod videodecoder;
 pub mod codecs {
     pub mod aac;
     pub mod h264;
-    pub mod vorbis;
     pub mod vpx;
 
     #[cfg(feature="ffmpeg")]
