@@ -508,7 +508,6 @@ impl<'a> container::Track<'a> for TrackImpl<'a> {
     }
 
     fn is_video(&self) -> bool { true }
-    fn is_audio(&self) -> bool { false }
 
     fn cluster_count(&self) -> Option<c_int> {
         None
@@ -539,7 +538,6 @@ impl<'a> container::Track<'a> for VideoTrackImpl<'a> {
     }
 
     fn is_video(&self) -> bool { true }
-    fn is_audio(&self) -> bool { false }
 
     fn cluster_count(&self) -> Option<c_int> {
         None

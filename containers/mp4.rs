@@ -7,8 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use audiodecoder;
-use codecs::aac::AacHeaders;
 use container;
 use pixelformat::PixelFormat;
 use streaming::StreamReader;
@@ -140,12 +138,6 @@ impl Mp4FileHandle {
         }
     }
 
-    pub fn audio_channels(&self, track_id: ffi::MP4TrackId) -> c_int {
-        unsafe {
-            ffi::MP4GetTrackAudioChannels(self.handle, track_id)
-        }
-    }
-
     pub fn integer_property(&self, track_id: ffi::MP4TrackId, property_name: &[u8])
                             -> Result<u64,()> {
         let property_name = CString::new(property_name).unwrap();
@@ -211,24 +203,6 @@ impl Mp4FileHandle {
                 is_sync_sample: is_sync_sample,
             })
         }
-    }
-
-	pub fn raw_es_configuration(&self, track_id: ffi::MP4TrackId) -> Result<AacHeaders,()> {
-        let result: Vec<u8> = unsafe {
-            let (mut value, mut value_size) = (ptr::null_mut(), 0);
-            let ok = ffi::MP4GetTrackRawESConfiguration(self.handle,
-                                                        track_id,
-                                                        &mut value,
-                                                        &mut value_size);
-            if ok {
-                slice::from_raw_parts_mut(value, value_size as usize).iter().map(|x| *x).collect()
-            } else {
-                return Err(())
-            }
-        };
-        Ok(AacHeaders {
-            esds_chunk: result,
-        })
     }
 
 	pub fn h264_headers(&self, track_id: ffi::MP4TrackId) -> Result<H264Headers,()> {
@@ -445,11 +419,6 @@ impl<'a> container::Track<'a> for TrackImpl<'a> {
                 id: self.id,
                 handle: self.handle,
             }) as Box<container::VideoTrack + 'a>)
-        } else if track_type == ffi::MP4_AUDIO_TRACK_TYPE {
-            container::TrackType::Audio(Box::new(AudioTrackImpl {
-                id: self.id,
-                handle: self.handle,
-            }) as Box<container::AudioTrack + 'a>)
         } else {
             container::TrackType::Other(self as Box<container::Track<'a> + 'a>)
         }
@@ -457,10 +426,6 @@ impl<'a> container::Track<'a> for TrackImpl<'a> {
 
     fn is_video(&self) -> bool {
         self.handle.track_type(self.id) == ffi::MP4_VIDEO_TRACK_TYPE
-    }
-
-    fn is_audio(&self) -> bool {
-        self.handle.track_type(self.id) == ffi::MP4_AUDIO_TRACK_TYPE
     }
 
     fn cluster_count(&self) -> Option<c_int> {
@@ -495,7 +460,6 @@ impl<'a> container::Track<'a> for VideoTrackImpl<'a> {
     }
 
     fn is_video(&self) -> bool { true }
-    fn is_audio(&self) -> bool { false }
 
     fn cluster_count(&self) -> Option<c_int> {
         Some(1)
@@ -547,63 +511,6 @@ impl<'a> container::VideoTrack<'a> for VideoTrackImpl<'a> {
                 Box::new(videodecoder::EmptyVideoHeadersImpl) as Box<videodecoder::VideoHeaders>
             }
 		}
-	}
-}
-
-#[derive(Clone)]
-pub struct AudioTrackImpl<'a> {
-    id: ffi::MP4TrackId,
-    handle: &'a Mp4FileHandle,
-}
-
-impl<'a> container::Track<'a> for AudioTrackImpl<'a> {
-    fn track_type(self: Box<Self>) -> container::TrackType<'a> {
-        container::TrackType::Audio(Box::new((*self).clone()) as Box<container::AudioTrack<'a> + 'a>)
-    }
-
-    fn is_video(&self) -> bool { false }
-    fn is_audio(&self) -> bool { false }
-
-    fn cluster_count(&self) -> Option<c_int> {
-        Some(1)
-    }
-
-    fn number(&self) -> c_long {
-        self.id as c_long
-    }
-
-    fn codec(&self) -> Option<Vec<u8>> {
-        get_codec(self.handle, self.id)
-    }
-
-    fn cluster<'b>(&'b self, cluster_index: i32) -> Result<Box<container::Cluster + 'b>,()> {
-        assert!(cluster_index == 0);
-        Ok(Box::new(ClusterImpl {
-            handle: self.handle,
-        }) as Box<container::Cluster + 'a>)
-    }
-}
-
-impl<'a> container::AudioTrack<'a> for AudioTrackImpl<'a> {
-    fn channels(&self) -> u16 {
-        // FIXME(pcwalton): This was determined experimentally and I was unable to find
-        // documentation that matches the MP4 examples I have. Is it right?
-        match self.handle.audio_channels(self.id) {
-            3 => {
-                // Surround sound
-                6
-            }
-            count => count as u16,
-        }
-    }
-
-    fn sampling_rate(&self) -> f64 {
-        self.handle.time_scale(self.id) as f64
-    }
-
-	fn headers(&self) -> Box<audiodecoder::AudioHeaders> {
-        let esds_chunk = self.handle.raw_es_configuration(self.id).unwrap();
-		Box::new(esds_chunk) as Box<audiodecoder::AudioHeaders>
 	}
 }
 
@@ -688,8 +595,6 @@ fn get_codec(handle: &Mp4FileHandle, id: ffi::MP4TrackId) -> Option<Vec<u8>> {
 pub const CONTAINER_READER: container::RegisteredContainerReader =
     container::RegisteredContainerReader {
         mime_types: &[
-            "audio/mp4",
-            "audio/quicktime",
             "video/mp4",
             "video/quicktime",
         ],
@@ -733,7 +638,6 @@ pub mod ffi {
 
     pub const MP4_OD_TRACK_TYPE: &'static [u8] = b"odsm";
     pub const MP4_SCENE_TRACK_TYPE: &'static [u8] = b"sdsm";
-    pub const MP4_AUDIO_TRACK_TYPE: &'static [u8] = b"soun";
     pub const MP4_VIDEO_TRACK_TYPE: &'static [u8] = b"vide";
     pub const MP4_HINT_TRACK_TYPE: &'static [u8] = b"hint";
     pub const MP4_CNTL_TRACK_TYPE: &'static [u8] = b"cntl";
@@ -778,7 +682,6 @@ pub mod ffi {
         pub fn MP4GetTrackVideoWidth(hFile: MP4FileHandle, trackId: MP4TrackId) -> u16;
         pub fn MP4GetTrackVideoHeight(hFile: MP4FileHandle, trackId: MP4TrackId) -> u16;
         pub fn MP4GetTrackVideoFrameRate(hFile: MP4FileHandle, trackId: MP4TrackId) -> c_double;
-        pub fn MP4GetTrackAudioChannels(hFile: MP4FileHandle, trackId: MP4TrackId) -> c_int;
         pub fn MP4GetTrackIntegerProperty(hFile: MP4FileHandle,
                                           trackId: MP4TrackId,
                                           propName: *const c_char,

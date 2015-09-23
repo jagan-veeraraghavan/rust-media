@@ -7,8 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use audiodecoder;
-use codecs::vorbis::VorbisHeaders;
 use container;
 use pixelformat::PixelFormat;
 use streaming::StreamReader;
@@ -25,7 +23,6 @@ use std::slice;
 use std::marker::PhantomData;
 
 const VIDEO_TRACK_TYPE: i32 = 1;
-const AUDIO_TRACK_TYPE: i32 = 2;
 #[allow(unused)] const SUBTITLE_TRACK_TYPE: i32 = 0x11;
 #[allow(unused)] const METADATA_TRACK_TYPE: i32 = 0x21;
 
@@ -290,14 +287,6 @@ impl<'a> Track<'a> {
                     phantom: PhantomData,
                 })
             }
-            AUDIO_TRACK_TYPE => {
-                TrackType::Audio(AudioTrack {
-                    track: unsafe {
-                        mem::transmute::<_,WebmAudioTrackRef>(self.track)
-                    },
-                    phantom: PhantomData,
-                })
-            }
             _ => TrackType::Other(self),
         }
     }
@@ -305,11 +294,6 @@ impl<'a> Track<'a> {
     pub fn is_video(&self) -> bool {
         let track_type = unsafe { WebmTrackGetType(self.track) as i32 };
         track_type == VIDEO_TRACK_TYPE
-    }
-
-    pub fn is_audio(&self) -> bool {
-        let track_type = unsafe { WebmTrackGetType(self.track) as i32 };
-        track_type == AUDIO_TRACK_TYPE
     }
 
     pub fn number(&self) -> c_long {
@@ -366,41 +350,6 @@ impl<'a> VideoTrack<'a> {
     pub fn frame_rate(&self) -> c_double {
         unsafe {
             WebmVideoTrackGetFrameRate(self.track)
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct AudioTrack<'a> {
-    track: WebmAudioTrackRef,
-    phantom: PhantomData<&'a u8>,
-}
-
-impl<'a> AudioTrack<'a> {
-    pub fn as_track(&self) -> Track<'a> {
-        Track {
-            track: unsafe {
-                mem::transmute::<_,WebmTrackRef>(self.track)
-            },
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn sampling_rate(&self) -> c_double {
-        unsafe {
-            WebmAudioTrackGetSamplingRate(self.track)
-        }
-    }
-
-    pub fn channels(&self) -> c_longlong {
-        unsafe {
-            WebmAudioTrackGetChannels(self.track)
-        }
-    }
-
-    pub fn bit_depth(&self) -> c_longlong {
-        unsafe {
-            WebmAudioTrackGetBitDepth(self.track)
         }
     }
 }
@@ -612,7 +561,6 @@ impl<'a> BlockFrame<'a> {
 
 pub enum TrackType<'a> {
     Video(VideoTrack<'a>),
-    Audio(AudioTrack<'a>),
     Other(Track<'a>),
 }
 
@@ -685,13 +633,6 @@ impl<'a> container::Track<'a> for TrackImpl<'a> {
                     reader: reader,
                 }) as Box<container::VideoTrack<'a> + 'a>)
             }
-            TrackType::Audio(track) => {
-                container::TrackType::Audio(Box::new(AudioTrackImpl {
-                    track: track,
-                    segment: segment,
-                    reader: reader,
-                }) as Box<container::AudioTrack<'a> + 'a>)
-            }
             TrackType::Other(track) => {
                 container::TrackType::Other(Box::new(TrackImpl {
                     track: track,
@@ -702,7 +643,6 @@ impl<'a> container::Track<'a> for TrackImpl<'a> {
         }
     }
     fn is_video(&self) -> bool { self.track.is_video() }
-    fn is_audio(&self) -> bool { self.track.is_audio() }
 
 
     fn cluster_count(&self) -> Option<c_int> {
@@ -735,7 +675,6 @@ impl<'a> container::Track<'a> for VideoTrackImpl<'a> {
     }
 
     fn is_video(&self) -> bool { true }
-    fn is_audio(&self) -> bool { false }
 
     fn cluster_count(&self) -> Option<c_int> {
         Some(self.segment.count() as c_int)
@@ -776,75 +715,6 @@ impl<'a> container::VideoTrack<'a> for VideoTrackImpl<'a> {
 		// TODO(pcwalton): Support H.264.
 		Box::new(videodecoder::EmptyVideoHeadersImpl) as Box<videodecoder::VideoHeaders>
 	}
-}
-
-#[derive(Clone)]
-struct AudioTrackImpl<'a> {
-    track: AudioTrack<'a>,
-    segment: &'a Segment,
-    reader: &'a MkvReader,
-}
-
-impl<'a> container::Track<'a> for AudioTrackImpl<'a> {
-    fn track_type(self: Box<Self>) -> container::TrackType<'a> {
-        container::TrackType::Audio(self as Box<container::AudioTrack<'a> + 'a>)
-    }
-
-    fn is_video(&self) -> bool { false }
-    fn is_audio(&self) -> bool { true }
-
-    fn cluster_count(&self) -> Option<c_int> {
-        Some(self.segment.count() as c_int)
-    }
-
-    fn number(&self) -> c_long {
-        self.track.as_track().number()
-    }
-
-    fn cluster<'b>(&'b self, cluster_index: i32) -> Result<Box<container::Cluster + 'b>,()> {
-        Ok(get_cluster(cluster_index, self.segment, self.reader))
-    }
-
-    fn codec(&self) -> Option<Vec<u8>> {
-        codec_id_to_fourcc(self.track.as_track().codec_id())
-    }
-}
-
-impl<'a> container::AudioTrack<'a> for AudioTrackImpl<'a> {
-    fn sampling_rate(&self) -> c_double {
-        self.track.sampling_rate()
-    }
-
-    fn channels(&self) -> u16 {
-        self.track.channels() as u16
-    }
-
-    fn headers(&self) -> Box<audiodecoder::AudioHeaders> {
-        // TODO(pcwalton): Support codecs other than Vorbis.
-        let track = self.track.as_track();
-        let mut private = track.codec_private();
-        assert!(private[0] == 2);
-        private = &private[1..private.len()];
-
-        let id_size = read_lacing_size(&mut private);
-        let comment_size = read_lacing_size(&mut private);
-        return Box::new(VorbisHeaders {
-            data: private.iter().map(|x| *x).collect(),
-            id_size: id_size,
-            comment_size: comment_size,
-        });
-
-        fn read_lacing_size(buffer: &mut &[u8]) -> usize {
-            let mut size = 0;
-            while buffer[0] == 255 {
-                size += 255;
-                *buffer = &(*buffer)[1..buffer.len()];
-            }
-            size += buffer[0] as usize;
-            *buffer = &(*buffer)[1..buffer.len()];
-            size
-        }
-    }
 }
 
 struct ClusterImpl<'a> {
@@ -969,7 +839,6 @@ type WebmSegmentInfoRef = *mut WebmSegmentInfo;
 type WebmTracksRef = *mut WebmTracks;
 type WebmTrackRef = *mut WebmTrack;
 type WebmVideoTrackRef = *mut WebmVideoTrack;
-type WebmAudioTrackRef = *mut WebmAudioTrack;
 type WebmClusterRef = *mut WebmCluster;
 type WebmBlockEntryRef = *mut WebmBlockEntry;
 type WebmBlockRef = *mut WebmBlock;
@@ -989,8 +858,6 @@ struct WebmTracks;
 struct WebmTrack;
 #[repr(C)]
 struct WebmVideoTrack;
-#[repr(C)]
-struct WebmAudioTrack;
 #[repr(C)]
 struct WebmCluster;
 #[repr(C)]
@@ -1056,11 +923,6 @@ extern {
     fn WebmVideoTrackGetWidth(track: WebmVideoTrackRef) -> c_longlong;
     fn WebmVideoTrackGetHeight(track: WebmVideoTrackRef) -> c_longlong;
     fn WebmVideoTrackGetFrameRate(track: WebmVideoTrackRef) -> c_double;
-
-    fn WebmAudioTrackDestroy(track: WebmAudioTrackRef);
-    fn WebmAudioTrackGetSamplingRate(track: WebmAudioTrackRef) -> c_double;
-    fn WebmAudioTrackGetChannels(track: WebmAudioTrackRef) -> c_longlong;
-    fn WebmAudioTrackGetBitDepth(track: WebmAudioTrackRef) -> c_longlong;
 
     fn WebmClusterDestroy(cluster: WebmClusterRef);
     fn WebmClusterEos(cluster: WebmClusterRef) -> bool;

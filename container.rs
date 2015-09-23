@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use audiodecoder;
 use containers::gif;
 use containers::mkv;
 use containers::mp4;
@@ -46,14 +45,6 @@ pub trait ContainerReader {
                     writeln!(&mut result, "  Cluster Count: {}", cluster_count).unwrap();
                 }
             }
-            TrackType::Audio(audio_track) => {
-                writeln!(&mut result, " Type: Audio").unwrap();
-                writeln!(&mut result, "  Channels: {}", audio_track.channels()).unwrap();
-                writeln!(&mut result, "  Rate: {}", audio_track.sampling_rate()).unwrap();
-                if let Some(cluster_count) = audio_track.cluster_count() {
-                    writeln!(&mut result, "  Cluster Count: {}", cluster_count).unwrap();
-                }
-            }
             _ => {}
         }
         result
@@ -63,7 +54,6 @@ pub trait ContainerReader {
 pub trait Track<'x> {
     fn track_type(self: Box<Self>) -> TrackType<'x>;
     fn is_video(&self) -> bool;
-    fn is_audio(&self) -> bool;
 
     /// Returns the number of clusters in this track, if possible. Returns `None` if this container
     /// has no table of contents (so the number of clusters is unknown).
@@ -93,12 +83,6 @@ pub trait VideoTrack<'a> : Track<'a> {
 	fn headers(&self) -> Box<videodecoder::VideoHeaders>;
 }
 
-pub trait AudioTrack<'a> : Track<'a> {
-    fn sampling_rate(&self) -> c_double;
-    fn channels(&self) -> u16;
-    fn headers(&self) -> Box<audiodecoder::AudioHeaders>;
-}
-
 pub trait Cluster {
     /// Reads out a frame from this cluster.
     fn read_frame<'a>(&'a self, frame_index: i32, track_number: c_long)
@@ -117,7 +101,6 @@ pub trait Frame {
 
 pub enum TrackType<'a> {
     Video(Box<VideoTrack<'a> + 'a>),
-    Audio(Box<AudioTrack<'a> + 'a>),
     Other(Box<Track<'a> + 'a>),
 }
 

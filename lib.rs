@@ -16,8 +16,6 @@ extern crate byteorder;
 #[cfg(target_os = "macos")]
 extern crate core_foundation;
 
-pub mod audiodecoder;
-pub mod audioformat;
 pub mod container;
 pub mod pixelformat;
 pub mod playback;
@@ -43,8 +41,6 @@ pub mod containers {
 pub mod platform {
     #[cfg(target_os="macos")]
     pub mod macos {
-        pub mod audiounit;
-        pub mod coreaudio;
         pub mod coremedia;
         pub mod corevideo;
         pub mod videotoolbox;
