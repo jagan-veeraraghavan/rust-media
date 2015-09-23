@@ -9,7 +9,6 @@
 
 //! Codec support via `libavcodec` from FFmpeg.
 
-use audiodecoder;
 use codecs::h264;
 use pixelformat::PixelFormat;
 use timing::Timestamp;
@@ -28,7 +27,6 @@ use std::marker::PhantomData;
 pub type AvCodecId = ffi::AVCodecID;
 
 pub const AV_CODEC_ID_H264: AvCodecId = 28;
-pub const AV_CODEC_ID_AAC: AvCodecId = 0x15000 + 2;
 
 pub const FF_INPUT_BUFFER_PADDING_SIZE: usize = 32;
 
@@ -145,21 +143,6 @@ impl AvCodecContext {
         };
         if result >= 0 && got_picture != 0 {
             Ok(result > 0)
-        } else {
-            Err(())
-        }
-    }
-
-    pub fn decode_audio(&self, frame: &AvFrame, packet: &mut AvPacket) -> Result<c_int,()> {
-        let mut got_frame = 0;
-        let result = unsafe {
-            ffi::avcodec_decode_audio4(self.context.ptr(),
-                                       frame.frame,
-                                       &mut got_frame,
-                                       packet.packet.ptr())
-        };
-        if result >= 0 && got_frame != 0 {
-            Ok(result)
         } else {
             Err(())
         }
@@ -326,17 +309,6 @@ impl AvFrame {
         let len = self.linesize(plane_index) * self.height();
         unsafe {
             slice::from_raw_parts_mut((*self.frame).data[plane_index], len as usize)
-        }
-    }
-
-    pub fn audio_data<'a>(&'a self, channel: usize, channels: i32) -> &'a [u8] {
-        let len = samples::buffer_size(channels,
-                                       self.sample_count(),
-                                       self.format(),
-                                       true).unwrap()
-                                            .linesize;
-        unsafe {
-            slice::from_raw_parts_mut((*self.frame).data[channel], len as usize)
         }
     }
 }
@@ -545,109 +517,6 @@ pub const VIDEO_DECODER: videodecoder::RegisteredVideoDecoder =
         constructor: VideoDecoderImpl::h264,
     };
 
-// Implementation of the abstract `AudioDecoder` interface
-
-struct AudioDecoderInfoImpl {
-    sample_rate: c_int,
-    channels: c_int,
-}
-
-impl AudioDecoderInfoImpl {
-    fn aac(_: &audiodecoder::AudioHeaders, sample_rate: f64, channels: u16)
-           -> Box<audiodecoder::AudioDecoderInfo + 'static> {
-        Box::new(AudioDecoderInfoImpl {
-            sample_rate: sample_rate as c_int,
-            channels: channels as c_int,
-        })
-    }
-}
-
-impl audiodecoder::AudioDecoderInfo for AudioDecoderInfoImpl {
-    fn create_decoder(self: Box<AudioDecoderInfoImpl>)
-                      -> Box<audiodecoder::AudioDecoder + 'static> {
-        init();
-
-        let codec = AvCodec::find_decoder(AV_CODEC_ID_AAC).unwrap();
-        let context = AvCodecContext::new(&codec);
-        let mut options = AvDictionary::new();
-        options.set("ac", &self.channels.to_string());
-        options.set("ar", &self.sample_rate.to_string());
-        options.set("request_sample_fmt", "fltp");
-
-        let (result, _) = context.open(&codec, options);
-        result.unwrap();
-        Box::new(AudioDecoderImpl {
-            context: context,
-            frame: None,
-        }) as Box<audiodecoder::AudioDecoder + 'static>
-    }
-}
-
-struct AudioDecoderImpl {
-    context: AvCodecContext,
-    frame: Option<AvFrame>,
-}
-
-impl audiodecoder::AudioDecoder for AudioDecoderImpl {
-    fn decode(&mut self, data: &[u8]) -> Result<(),()> {
-        let data_len = data.len();
-        let mut data: Vec<_> = data.iter().map(|x| *x).collect();
-        for _ in 0 .. FF_INPUT_BUFFER_PADDING_SIZE {
-            data.push(0);
-        }
-        let mut packet = AvPacket::new(&mut data);
-        let frame = AvFrame::new();
-        let result = self.context.decode_audio(&frame, &mut packet);
-        match result {
-            Ok(length) if length as usize == data_len => {
-                self.frame = Some(frame);
-                Ok(())
-            }
-            _ => Err(()),
-        }
-    }
-
-    fn decoded_samples<'a>(&'a mut self)
-                           -> Result<Box<audiodecoder::DecodedAudioSamples + 'a>,()> {
-        match self.frame {
-            Some(ref frame) => {
-                Ok(Box::new(DecodedAudioSamplesImpl {
-                    frame: frame,
-                    channels: self.context.channels(),
-                }) as Box<audiodecoder::DecodedAudioSamples>)
-            }
-            None => Err(()),
-        }
-    }
-
-    fn acknowledge(&mut self, _: c_int) {
-        self.frame = None
-    }
-}
-
-struct DecodedAudioSamplesImpl<'a> {
-    frame: &'a AvFrame,
-    channels: i32,
-}
-
-impl<'a> audiodecoder::DecodedAudioSamples for DecodedAudioSamplesImpl<'a> {
-    fn samples<'b>(&'b self, channel: i32) -> Option<&'b [f32]> {
-        let data = self.frame.audio_data(channel as usize, self.channels);
-        unsafe {
-            Some(mem::transmute::<&[f32],
-                                  &'b [f32]>(slice::from_raw_parts((data.as_ptr() as *const f32),
-                                                                 data.len() /
-                                                                    mem::size_of::<f32>())))
-        }
-    }
-}
-
-pub const AUDIO_DECODER: audiodecoder::RegisteredAudioDecoder =
-    audiodecoder::RegisteredAudioDecoder {
-        id: [ b'a', b'a', b'c', b' ' ],
-        constructor: AudioDecoderInfoImpl::aac,
-    };
-
 #[allow(missing_copy_implementations)]
 pub mod ffi {
     use libc::{c_char, c_double, c_float, c_int, c_short, c_uint, c_void};
@@ -806,7 +675,6 @@ pub mod ffi {
         pub request_channels: c_int,    // NB: Behind `#ifdef FF_API_REQUEST_CHANNELS`!
         pub channel_layout: u64,
         pub request_channel_layout: u64,
-        pub audio_service_type: c_int,
         pub request_sample_fmt: c_int,
         // NB: The next three are behind `#ifdef FF_API_GET_BUFFER`!
         pub get_buffer: extern "C" fn(c: *mut AVCodecContext, pic: *mut AVFrame) -> c_int,
@@ -929,7 +797,6 @@ pub mod ffi {
         pub request_channels: c_int,    // NB: Behind `#ifdef FF_API_REQUEST_CHANNELS`!
         pub channel_layout: u64,
         pub request_channel_layout: u64,
-        pub audio_service_type: c_int,
         pub request_sample_fmt: c_int,
         // NB: The next three are behind `#ifdef FF_API_GET_BUFFER`!
         pub get_buffer: extern "C" fn(c: *mut AVCodecContext, pic: *mut AVFrame) -> c_int,
@@ -1091,11 +958,6 @@ pub mod ffi {
         pub fn avcodec_decode_video2(avctx: *mut AVCodecContext,
                                      picture: *mut AVFrame,
                                      got_picture_ptr: *mut c_int,
-                                     avpkt: *const AVPacket)
-                                     -> c_int;
-        pub fn avcodec_decode_audio4(avctx: *mut AVCodecContext,
-                                     frame: *mut AVFrame,
-                                     got_frame_ptr: *mut c_int,
                                      avpkt: *const AVPacket)
                                      -> c_int;
         pub fn av_codec_set_pkt_timebase(avctx: *mut AVCodecContext, val: AVRational);
