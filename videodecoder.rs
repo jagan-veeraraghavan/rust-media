@@ -6,7 +6,7 @@
 // except according to those terms.
 
 use codecs::vpx;
-use containers::gif;
+
 use pixelformat::PixelFormat;
 use timing::Timestamp;
 
@@ -84,30 +84,30 @@ impl RegisteredVideoDecoder {
 // FIXME(pcwalton): Combinatorial explosion imminent. :( Can we do something clever with macros?
 
 #[cfg(all(target_os="macos", feature="ffmpeg"))]
-pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 4] = [
+pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 3] = [
     vpx::VIDEO_DECODER,
-    gif::VIDEO_DECODER,
+    
     libavcodec::VIDEO_DECODER,
     platform::macos::videotoolbox::VIDEO_DECODER,
 ];
 
 #[cfg(all(target_os="macos", not(feature="ffmpeg")))]
-pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 3] = [
+pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 2] = [
     vpx::VIDEO_DECODER,
-    gif::VIDEO_DECODER,
+    
     platform::macos::videotoolbox::VIDEO_DECODER,
 ];
 
 #[cfg(all(not(target_os="macos"), feature="ffmpeg"))]
-pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 3] = [
+pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 2] = [
     vpx::VIDEO_DECODER,
-    gif::VIDEO_DECODER,
+    
     libavcodec::VIDEO_DECODER,
 ];
 
 #[cfg(all(not(target_os="macos"), not(feature="ffmpeg")))]
-pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 2] = [
+pub static VIDEO_DECODERS: [RegisteredVideoDecoder; 1] = [
     vpx::VIDEO_DECODER,
-    gif::VIDEO_DECODER,
+    
 ];
 

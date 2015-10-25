@@ -8,8 +8,7 @@
 // except according to those terms.
 
 use audiodecoder;
-use containers::gif;
-use containers::mkv;
+
 use containers::mp4;
 use pixelformat::PixelFormat;
 use streaming::StreamReader;
@@ -147,9 +146,9 @@ impl RegisteredContainerReader {
     }
 }
 
-pub static CONTAINER_READERS: [RegisteredContainerReader; 3] = [
-    mkv::CONTAINER_READER,
+pub static CONTAINER_READERS: [RegisteredContainerReader; 1] = [
+    
     mp4::CONTAINER_READER,
-    gif::CONTAINER_READER,
+    
 ];
 

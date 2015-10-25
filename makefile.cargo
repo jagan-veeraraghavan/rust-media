@@ -6,7 +6,7 @@ OBJS = $(SRC:%.cpp=$(OUT_DIR)/%.o)
 
 LIBWEBM_OUTDIR ?= $(shell find $(OUT_DIR)/../.. -name 'libwebm-*' '(' -type d -or -type l ')')/out
 
-CXXFLAGS += -std=gnu++11 -Wall -I$(LIBWEBM_OUTDIR) -O2 -fPIC
+CXXFLAGS += -std=gnu++11 -Wall -I$(LIBWEBM_OUTDIR) -O2 -fPIC -I /usr/local/include -L /usr/local/lib
 
 .PHONY:	all
 

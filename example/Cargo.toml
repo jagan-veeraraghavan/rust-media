@@ -11,7 +11,7 @@ path = "example.rs"
 
 [dependencies.rust-media]
 
-path = ".."
+git = "https://github.com/jagan-veeraraghavan/rust-media.git"
 features = ["ffmpeg"]
 
 [dependencies.clock_ticks]

@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(alloc, collections, core, libc, box_patterns, unsafe_no_drop_flag, duration)]
+#![feature(alloc, collections, core, libc, box_patterns, unsafe_no_drop_flag, duration,vec_push_all,heap_api,slice_bytes,iter_cmp,vec_resize)]
 
 extern crate alloc;
 extern crate libc;
@@ -28,7 +28,7 @@ pub mod videodecoder;
 pub mod codecs {
     pub mod aac;
     pub mod h264;
-    pub mod vorbis;
+    
     pub mod vpx;
 
     #[cfg(feature="ffmpeg")]
@@ -36,10 +36,8 @@ pub mod codecs {
 }
 
 pub mod containers {
-    pub mod gif;
-    pub mod mkv;
+    
     pub mod mp4;
-    pub mod ogg;
 }
 
 pub mod platform {

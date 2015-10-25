@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(collections, libc, rustc_private, thread_sleep, duration)]
+#![feature(collections, libc, rustc_private,vec_resize)]
 
 extern crate clock_ticks;
 extern crate libc;
@@ -24,7 +24,7 @@ use media::playback::Player;
 use media::videodecoder::{DecodedVideoFrame, VideoDecoder};
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use sdl2::event::{Event, WindowEventId};
-use sdl2::keycode::KeyCode;
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::{Renderer, RendererParent};
@@ -62,14 +62,14 @@ impl ExampleMediaPlayer {
     /// Polls events so we can quit if the user wanted to. Returns true to continue or false to
     /// quit.
     fn poll_events(&mut self, sdl_context: &mut sdl2::Sdl, player: &mut Player) -> bool {
-        let mut event_pump = sdl_context.event_pump();
+        let mut event_pump = sdl_context.event_pump().unwrap();
 
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {
                     ..
                 } | Event::KeyDown {
-                    keycode: KeyCode::Escape,
+                    keycode: Some(Keycode::Escape),
                     ..
                 } => {
                     return false
@@ -102,8 +102,8 @@ impl<'a> ExampleVideoRenderer<'a> {
                -> ExampleVideoRenderer<'b> {
         let texture = renderer.create_texture(video_format.sdl_pixel_format,
                                              TextureAccess::Streaming,
-                                             (video_format.sdl_width as i32,
-                                              video_height))
+                                             (video_format.sdl_width as u32,
+                                              video_height as u32))
                         .ok().expect("Could not create rendered texture");
         ExampleVideoRenderer {
             texture: texture,
@@ -117,18 +117,14 @@ impl<'a> ExampleVideoRenderer<'a> {
                 sdl_context: &sdl2::Sdl) {
 
         let video_track = player.video_track().unwrap();
+        let (width, height) = self.renderer.window().unwrap().size();
 
-        let rect = if let &RendererParent::Window(ref window) = self.renderer.get_parent() {
-            let (width, height) = window.properties_getters(&sdl_context.event_pump()).get_size();
-            Rect::new(0, 0, width, height)
-        } else {
-            panic!("Renderer parent wasn't a window!")
-        };
+        let rect = Rect::new_unwrap(0, 0, width, height);
 
         self.upload(image, &*video_track);
-        let mut drawer = self.renderer.drawer();
-        drawer.copy(&self.texture, None, Some(rect));
-        drawer.present();
+        //let mut drawer = self.renderer.drawer();
+        self.renderer.copy(&self.texture, None, Some(rect));
+        self.renderer.present();
     }
 
     fn upload(&mut self, image: Box<DecodedVideoFrame + 'static>, video_track: &VideoTrack) {
@@ -219,16 +215,17 @@ impl AudioCallback for ExampleAudioRenderer {
 }
 
 impl ExampleAudioRenderer {
-    pub fn new(sample_rate: f64, channels: u16) -> AudioDevice<ExampleAudioRenderer> {
+    pub fn new(sample_rate: f64, channels: u16,sdl_context: &sdl2::Sdl) -> AudioDevice<ExampleAudioRenderer> {
         let desired_spec = AudioSpecDesired {
             freq: Some(sample_rate as i32),
             channels: Some(cmp::min(channels, 2) as u8),
             samples: None,
         };
-        AudioDevice::open_playback(None, desired_spec, |spec| {
+        let audio_subsystem = sdl_context.audio().unwrap();
+        audio_subsystem.open_playback(None, desired_spec, |spec| {
             ExampleAudioRenderer {
                 samples: Vec::new(),
-                channels: spec.channels,
+                channels: 2,//spec.channels,
             }
         }).unwrap()
     }
@@ -305,7 +302,9 @@ fn main() {
         return
     }
 
-    let mut sdl_context = sdl2::init().video().audio().build().ok().expect("Could not start SDL");
+    let mut sdl_context = sdl2::init().unwrap();
+    let mut video = sdl_context.video().unwrap();
+    
     let file = Box::new(File::open(&args[1])
                         .ok().expect("Could not open media file"));
 
@@ -313,7 +312,7 @@ fn main() {
     let mut media_player = ExampleMediaPlayer::new();
 
     let renderer = player.video_track().map(|video_track| {
-        let window = WindowBuilder::new(&sdl_context,
+        let window = WindowBuilder::new(&video,
                                 "rust-media example",
                                  video_track.width() as u32,
                                  video_track.height() as u32)
@@ -336,7 +335,7 @@ fn main() {
 
     let mut audio_renderer = player.audio_track().map(|audio_track| {
         let renderer = ExampleAudioRenderer::new(audio_track.sampling_rate(),
-                                                 audio_track.channels());
+                                                 audio_track.channels(),&sdl_context);
         renderer.resume();
         renderer
     });

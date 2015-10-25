@@ -15,5 +15,8 @@ fn main() {
         .unwrap();
     assert!(result.success());
     println!("cargo:rustc-flags=-L native={}", out_dir);
+    println!("cargo:libdir=/usr/local/lib");
+    println!("cargo:includedir=/usr/local/include");
+
 }
 

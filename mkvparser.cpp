@@ -267,7 +267,8 @@ extern "C" long long WebmBlockGetTrackNumber(WebmBlockRef block) {
 }
 
 extern "C" long long WebmBlockDiscardPadding(WebmBlockRef block) {
-    return block->GetDiscardPadding();
+
+    return 0LL; //block->GetDiscardPadding();
 }
 
 extern "C" long long WebmBlockGetTimeCode(WebmBlockRef block, WebmClusterRef cluster) {

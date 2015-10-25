@@ -8,7 +8,6 @@
 // except according to those terms.
 
 use codecs::aac::AacHeaders;
-use codecs::vorbis::{self, VorbisHeaders};
 
 use libc::c_int;
 
@@ -18,7 +17,7 @@ use codecs::libavcodec;
 use platform;
 
 pub trait AudioHeaders {
-    fn vorbis_headers<'a>(&'a self) -> Option<&'a VorbisHeaders>;
+    
     fn aac_headers<'a>(&'a self) -> Option<&'a AacHeaders>;
 }
 
@@ -41,9 +40,7 @@ pub trait DecodedAudioSamples {
 pub struct EmptyAudioHeadersImpl;
 
 impl AudioHeaders for EmptyAudioHeadersImpl {
-    fn vorbis_headers<'a>(&'a self) -> Option<&'a VorbisHeaders> {
-        None
-    }
+    
     fn aac_headers<'a>(&'a self) -> Option<&'a AacHeaders> {
         None
     }
@@ -77,26 +74,26 @@ impl RegisteredAudioDecoder {
 }
 
 #[cfg(all(target_os="macos", feature="ffmpeg"))]
-pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 3] = [
-    vorbis::AUDIO_DECODER,
+pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 2] = [
+    
     libavcodec::AUDIO_DECODER,
     platform::macos::audiounit::AUDIO_DECODER,
 ];
 
 #[cfg(all(target_os="macos", not(feature="ffmpeg")))]
-pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 2] = [
-    vorbis::AUDIO_DECODER,
+pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 1] = [
+    
     platform::macos::audiounit::AUDIO_DECODER,
 ];
 
 #[cfg(all(not(target_os="macos"), feature="ffmpeg"))]
-pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 2] = [
-    vorbis::AUDIO_DECODER,
+pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 1] = [
+    
     libavcodec::AUDIO_DECODER,
 ];
 
 #[cfg(all(not(target_os="macos"), not(feature="ffmpeg")))]
-pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 1] = [
-    vorbis::AUDIO_DECODER,
+pub static AUDIO_DECODERS: [RegisteredAudioDecoder; 0] = [
+    
 ];
 

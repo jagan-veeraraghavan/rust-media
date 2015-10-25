@@ -16,25 +16,16 @@ path = "lib.rs"
 git = "https://github.com/Gankro/libvpx"
 branch = "patch-1"
 
-[dependencies.libwebm-sys]
 
-git = "https://github.com/Gankro/libwebm"
-branch = "patch-1"
 
 [dependencies.mp4v2-sys]
 
 git = "https://github.com/Gankro/mp4v2"
 branch = "patch-1"
 
-[dependencies.ogg-sys]
 
-git = "https://github.com/Gankro/ogg"
-branch = "patch-1"
 
-[dependencies.vorbis-sys]
 
-git = "https://github.com/Gankro/vorbis"
-branch = "patch-3"
 
 [dependencies.giflib-sys]
 
