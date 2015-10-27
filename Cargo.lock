@@ -1,0 +1,44 @@
+[root]
+name = "rust-media"
+version = "0.1.0"
+dependencies = [
+ "byteorder 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core_foundation 0.1.0 (git+https://github.com/servo/rust-core-foundation?rev=928efbae42fc596e6ede2cf0949c3d6d6f3dad8f)",
+ "giflib-sys 0.1.0 (git+https://github.com/Gankro/giflib?branch=patch-1)",
+ "libvpx-sys 0.1.0 (git+https://github.com/Gankro/libvpx?branch=patch-1)",
+ "mp4v2-sys 0.1.0 (git+https://github.com/Gankro/mp4v2?branch=patch-1)",
+]
+
+[[package]]
+name = "byteorder"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "core_foundation"
+version = "0.1.0"
+source = "git+https://github.com/servo/rust-core-foundation?rev=928efbae42fc596e6ede2cf0949c3d6d6f3dad8f#928efbae42fc596e6ede2cf0949c3d6d6f3dad8f"
+dependencies = [
+ "libc 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "giflib-sys"
+version = "0.1.0"
+source = "git+https://github.com/Gankro/giflib?branch=patch-1#1c006086b40059338f37344c9ace06040bbe3caa"
+
+[[package]]
+name = "libc"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "libvpx-sys"
+version = "0.1.0"
+source = "git+https://github.com/Gankro/libvpx?branch=patch-1#72afde506cc94a684ced756149326b2656192578"
+
+[[package]]
+name = "mp4v2-sys"
+version = "0.1.0"
+source = "git+https://github.com/Gankro/mp4v2?branch=patch-1#5bcacb721d7f9e605f4cecbaef6a3f47d7ceffdb"
+
